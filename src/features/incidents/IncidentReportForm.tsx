@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { incidentFormSchema, incidentSubmissionSchema, type IncidentFormValues } from './incidentSchemas'
 import { enqueueIncidentSubmission } from './incidentOfflineQueue'
-import { useCreateIncidentDraft, useIncidentOrganization, useSubmitIncident, useSubmitNewIncident, useUpdateIncidentDraft, useUploadIncidentEvidence } from './useIncidentData'
+import { useCreateIncidentDraft, useIncident, useIncidentOrganization, useSubmitIncident, useSubmitNewIncident, useUpdateIncidentDraft, useUploadIncidentEvidence } from './useIncidentData'
 import type { IncidentDetail, IncidentDraftInput, IncidentReportType, IncidentSubmissionInput } from './incidentTypes'
 
 const stages = ['Event', 'Location & context', 'People', 'Evidence & sign-off'] as const
@@ -76,9 +76,10 @@ function combineOccurrenceDateTime(values: IncidentFormValues) {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
 
-function toDraftInput(values: IncidentFormValues): IncidentDraftInput {
+function toDraftInput(values: IncidentFormValues, draftStage: number): IncidentDraftInput {
   return {
     reportType: values.reportType,
+    draftStage,
     title: values.title,
     description: values.description,
     occurredAt: combineOccurrenceDateTime(values),
@@ -112,6 +113,8 @@ function toDraftInput(values: IncidentFormValues): IncidentDraftInput {
 
 export function IncidentReportForm({ supabase, reportType, initialTitle, initialCategory, initialEnvironmentalImpact, draftId: existingDraftId, initialIncident, onBack }: { supabase: SupabaseClient; reportType: IncidentReportType; initialTitle?: string; initialCategory?: string; initialEnvironmentalImpact?: boolean; draftId?: string; initialIncident?: IncidentDetail; onBack: () => void }) {
   const organization = useIncidentOrganization(supabase)
+  const existingDraft = useIncident(supabase, existingDraftId || null)
+  const loadedIncident = initialIncident || existingDraft.data
   const [sites, setSites] = useState<SiteOption[]>([])
   const [settings, setSettings] = useState<Record<string, unknown>>({})
   const [submitMessage, setSubmitMessage] = useState('')
@@ -179,30 +182,33 @@ export function IncidentReportForm({ supabase, reportType, initialTitle, initial
   }, [organization.data?.userId, supabase])
 
   useEffect(() => {
-    if (!initialIncident) return
-    const occurred = initialIncident.occurredAt ? new Date(initialIncident.occurredAt) : null
+    if (!loadedIncident) return
+    setDraftId(loadedIncident.id)
+    setDraftReference(loadedIncident.referenceNumber)
+    setDraftType('manual')
+    const occurred = loadedIncident.occurredAt ? new Date(loadedIncident.occurredAt) : null
     form.reset({
-      reportType: initialIncident.reportType,
-      title: initialIncident.title,
-      description: initialIncident.description || '',
+      reportType: loadedIncident.reportType,
+      title: loadedIncident.title === 'Untitled draft' ? '' : loadedIncident.title,
+      description: loadedIncident.description || '',
       occurrenceDate: occurred && !Number.isNaN(occurred.getTime()) ? occurred.toISOString().slice(0, 10) : '',
       occurrenceTime: occurred && !Number.isNaN(occurred.getTime()) ? occurred.toTimeString().slice(0, 5) : '',
-      siteId: initialIncident.siteId || '',
-      facilityId: initialIncident.facilityId || '',
-      location: initialIncident.location || '',
-      department: initialIncident.department || '',
-      shift: initialIncident.shift || '',
-      workActivityContext: initialIncident.workActivityContext || '',
-      severity: initialIncident.severity || '',
-      potentialSeverity: initialIncident.potentialSeverity || '',
-      incidentCategory: initialIncident.incidentCategory || '',
-      contractorInvolved: initialIncident.contractorInvolved,
-      contractorOrganization: initialIncident.contractorOrganization || '',
-      environmentalImpact: initialIncident.environmentalImpact,
-      injuryOrIllness: initialIncident.injuryOrIllness,
-      propertyDamage: initialIncident.propertyDamage,
-      workRelated: initialIncident.workRelated,
-      immediateCorrection: initialIncident.immediateCorrection || '',
+      siteId: loadedIncident.siteId || '',
+      facilityId: loadedIncident.facilityId || '',
+      location: loadedIncident.location || '',
+      department: loadedIncident.department || '',
+      shift: loadedIncident.shift || '',
+      workActivityContext: loadedIncident.workActivityContext || '',
+      severity: loadedIncident.severity || '',
+      potentialSeverity: loadedIncident.potentialSeverity || '',
+      incidentCategory: loadedIncident.incidentCategory || '',
+      contractorInvolved: loadedIncident.contractorInvolved,
+      contractorOrganization: loadedIncident.contractorOrganization || '',
+      environmentalImpact: loadedIncident.environmentalImpact,
+      injuryOrIllness: loadedIncident.injuryOrIllness,
+      propertyDamage: loadedIncident.propertyDamage,
+      workRelated: loadedIncident.workRelated,
+      immediateCorrection: loadedIncident.immediateCorrection || '',
       priority: '',
       gpsCoordinates: '',
       weatherConditions: '',
@@ -213,7 +219,8 @@ export function IncidentReportForm({ supabase, reportType, initialTitle, initial
       digitalSignature: '',
       accuracyConfirmed: false,
     })
-  }, [form, initialIncident])
+    setActiveStage(Math.max(0, Math.min(loadedIncident.draftStage || 0, stages.length - 1)))
+  }, [form, loadedIncident])
 
   useEffect(() => {
     if (!organization.data?.organizationId) return
@@ -229,6 +236,9 @@ export function IncidentReportForm({ supabase, reportType, initialTitle, initial
     return () => { active = false }
   }, [organization.data?.organizationId, supabase])
 
+  if (existingDraftId && existingDraft.isLoading) return <div className="workspace-panel">Loading draft...</div>
+  if (existingDraftId && (existingDraft.isError || !loadedIncident || loadedIncident.status !== 'draft')) return <div className="workspace-panel"><div className="auth-message error">This draft could not be loaded or is no longer editable.</div><a className="button button-outline workspace-back-link" href="#my-reports">Return to My Reports</a></div>
+
   const configuredSites = settings.operational_sites === undefined ? sites : sites.filter((site) => configuredSiteNames(settings.operational_sites).some((name) => name.toLowerCase() === site.name.toLowerCase()))
   const departments = configuredOptions(settings.departments, [])
   const shifts = configuredShiftNames(settings.working_hours)
@@ -239,11 +249,11 @@ export function IncidentReportForm({ supabase, reportType, initialTitle, initial
   const isSubmitting = submitIncident.isPending || submitNewIncident.isPending
   const isBusy = isSaving || isSubmitting
 
-  const saveDraft = form.handleSubmit(async (values) => {
+  const saveDraft = async () => {
     setSubmitError('')
     setSubmitMessage('')
     try {
-      const input = toDraftInput(values)
+      const input = toDraftInput(form.getValues(), activeStage)
       const saved = draftId ? await updateDraft.mutateAsync({ incidentId: draftId, input }) : await createDraft.mutateAsync(input)
       setDraftId(saved.id)
       setDraftReference(saved.referenceNumber)
@@ -252,16 +262,13 @@ export function IncidentReportForm({ supabase, reportType, initialTitle, initial
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Unable to save the draft.')
     }
-  }, () => {
-    setSubmitError('Please correct the highlighted fields before saving the draft.')
-    setSubmitMessage('')
-  })
+  }
 
   const submitReport = form.handleSubmit(async (values) => {
     setSubmitError('')
     setSubmitMessage('')
     const candidate: IncidentSubmissionInput = {
-      ...toDraftInput(values),
+      ...toDraftInput(values, activeStage),
       title: values.title || '',
       description: values.description || '',
       occurredAt: combineOccurrenceDateTime(values) || '',
@@ -351,8 +358,7 @@ export function IncidentReportForm({ supabase, reportType, initialTitle, initial
           <h2>Report an incident</h2>
           <p>Progressive form — drafts are auto-saved and can be submitted offline; they sync when connectivity returns.</p>
         </div>
-        <div className="incident-form-header-actions"><a className="button button-outline button-small" href="#my-reports">My Reports</a></div>
-        <button className="button button-outline incident-save-button" type="button" disabled={isBusy} onClick={() => void saveDraft()}>Save draft</button>
+        <div className="incident-form-header-actions"><a className="button button-outline button-small" href="#my-reports">My Reports</a><button className="button button-outline button-small" type="button" disabled={isBusy} onClick={() => void saveDraft()}>{isSaving ? 'Saving...' : 'Save as draft'}</button></div>
       </div>
       <div className="incident-stage-progress"><div className="incident-stage-bar"><span style={{ width: `${((activeStage + 1) / stages.length) * 100}%` }} /></div><div className="incident-stage-labels">{stages.map((stage, index) => <button type="button" className={index === activeStage ? 'active' : index < activeStage ? 'complete' : ''} key={stage} onClick={() => index <= activeStage && setActiveStage(index)}>{index + 1}. {stage}</button>)}</div></div>
       <div className="incident-wizard-layout">
@@ -391,7 +397,7 @@ export function IncidentReportForm({ supabase, reportType, initialTitle, initial
           </div>
         </section>}
         {activeStage === 3 && <section className="incident-form-section"><div className="incident-form-section-heading"><div><h3>Evidence and sign-off</h3><p>Images, PDF, Word, Excel, and video evidence are supported.</p></div></div><div className="incident-evidence-upload-grid"><label className="incident-upload-tile">Photo<input type="file" hidden accept="image/*" capture="environment" onChange={handleEvidence} /></label><label className="incident-upload-tile">Video<input type="file" hidden accept="video/*" capture="environment" onChange={handleEvidence} /></label><label className="incident-upload-tile">Documents<input type="file" hidden accept="application/pdf,.doc,.docx,.xls,.xlsx" onChange={handleEvidence} /></label></div><label className="checkbox-field"><input type="checkbox" {...form.register('accuracyConfirmed')} /> I confirm this report is accurate to the best of my knowledge. *</label></section>}
-        {draftReference && <div className="incident-reference" role="status"><span>{draftType === 'manual' ? 'Manual draft' : 'Draft reference'}</span><strong>{draftReference}</strong></div>}
+        {(draftReference || loadedIncident?.referenceNumber) && <div className="incident-reference" role="status"><span>{draftType === 'manual' || loadedIncident ? 'Manual draft' : 'Draft reference'}</span><strong>{draftReference || loadedIncident?.referenceNumber}</strong></div>}
         {submitError && <div className="auth-message error" role="alert">{submitError}</div>}
         {submitMessage && <div className="auth-message success" role="status">{submitMessage}</div>}
         <div className="incident-form-actions">

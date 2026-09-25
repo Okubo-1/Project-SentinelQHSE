@@ -2590,6 +2590,18 @@ blockquote footer span {
   gap: 24px;
 }
 
+.incident-form-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.incident-form-header-actions .button {
+  width: 145px;
+  white-space: nowrap;
+}
+
 .incident-form-header h2 {
   margin: 9px 0 7px;
   font-size: clamp(30px, 3vw, 44px);
