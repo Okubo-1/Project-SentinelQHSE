@@ -401,6 +401,7 @@ export function IncidentReportForm({ supabase, reportType, initialTitle, initial
         {submitError && <div className="auth-message error" role="alert">{submitError}</div>}
         {submitMessage && <div className="auth-message success" role="status">{submitMessage}</div>}
         <div className="incident-form-actions">
+          {activeStage === 1 && <button className="button button-outline button-large" type="button" disabled={isBusy} onClick={() => setActiveStage(0)}>Back</button>}
           {activeStage < stages.length - 1 ? <button className="button button-green button-large" type="button" disabled={isBusy} onClick={() => void continueStage()}>Continue</button> : (
             <>
               <button className="button button-outline button-large" type="button" disabled={isBusy} onClick={() => void saveDraft()}>Save as Draft</button>
