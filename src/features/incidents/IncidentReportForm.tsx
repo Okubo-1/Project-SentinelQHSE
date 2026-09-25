@@ -11,6 +11,29 @@ import type { IncidentDetail, IncidentDraftInput, IncidentReportType, IncidentSu
 
 const stages = ['Event', 'Location & context', 'People', 'Evidence & sign-off'] as const
 
+const incidentCategories = [
+  'Injury / Illness',
+  'Vehicle / Transportation Incident',
+  'Fire / Explosion',
+  'Environmental Incident',
+  'Oil / Chemical Spill',
+  'Property / Equipment Damage',
+  'Process Safety Incident',
+  'Electrical Incident',
+  'Dropped Object',
+  'Slip / Trip / Fall',
+  'Exposure to Hazardous Substance',
+  'Security Incident',
+  'Structural / Facility Incident',
+  'Equipment / Machinery Failure',
+  'Occupational Health Incident',
+  'Marine / Offshore Incident',
+  'Gas Release / Leak',
+  'Other',
+] as const
+
+const incidentSeverities = ['Low', 'Medium', 'High'] as const
+
 type SiteOption = { id: string; name: string }
 function configuredOptions(value: unknown, fallback: string[], legacyValue = '') {
   if (!Array.isArray(value)) return legacyValue ? [legacyValue] : fallback
@@ -21,34 +44,6 @@ function configuredOptions(value: unknown, fallback: string[], legacyValue = '')
   })
   if (legacyValue && !options.some((option) => option.toLowerCase() === legacyValue.toLowerCase())) options.push(legacyValue)
   return options.length ? options : legacyValue ? [legacyValue] : fallback
-}
-
-function normalizeIncidentCategoryName(value: string) {
-  const normalized = value.trim().toLowerCase().replace(/\s+/g, ' ')
-  const legacyMap: Record<string, string> = {
-    'near miss': 'Near Miss',
-    'near-miss': 'Near Miss',
-    'unsafe condition': 'Unsafe Condition',
-    'unsafe act': 'Unsafe Act',
-    'environmental incident': 'Environmental Incident',
-    'environmental event': 'Environmental Incident',
-    'slip trip fall': 'Slip/Trip/Fall',
-    'slip/trip/fall': 'Slip/Trip/Fall',
-  }
-  return legacyMap[normalized] || value.trim()
-}
-
-function configuredIncidentCategories(value: unknown, legacyValue = '') {
-  if (!Array.isArray(value)) return legacyValue ? [normalizeIncidentCategoryName(legacyValue)] : []
-  const options = value.flatMap((item) => {
-    const rawName = typeof item === 'string' ? item : item && typeof item === 'object' && typeof (item as Record<string, unknown>).name === 'string' ? (item as Record<string, unknown>).name as string : ''
-    if (!rawName || (typeof item === 'object' && item !== null && 'active' in item && (item as Record<string, unknown>).active === false)) return []
-    const name = normalizeIncidentCategoryName(rawName)
-    return name ? [name] : []
-  })
-  const normalizedLegacy = legacyValue ? normalizeIncidentCategoryName(legacyValue) : ''
-  if (normalizedLegacy && !options.some((option) => option.toLowerCase() === normalizedLegacy.toLowerCase())) options.push(normalizedLegacy)
-  return options.length ? options : normalizedLegacy ? [normalizedLegacy] : []
 }
 
 function configuredSiteNames(value: unknown) {
@@ -158,8 +153,6 @@ export function IncidentReportForm({ supabase, reportType, initialTitle, initial
       witnessContactDetails: '',
     },
   })
-  const selectedSeverity = form.watch('severity')
-  const selectedCategory = form.watch('incidentCategory')
   const [reporterName, setReporterName] = useState('Authenticated user')
 
   useEffect(() => {
@@ -239,8 +232,8 @@ export function IncidentReportForm({ supabase, reportType, initialTitle, initial
   const configuredSites = settings.operational_sites === undefined ? sites : sites.filter((site) => configuredSiteNames(settings.operational_sites).some((name) => name.toLowerCase() === site.name.toLowerCase()))
   const departments = configuredOptions(settings.departments, [])
   const shifts = configuredShiftNames(settings.working_hours)
-  const categories = configuredIncidentCategories(settings.incident_categories, selectedCategory)
-  const severities = configuredOptions(settings.severity_levels, [], selectedSeverity)
+  const categories = incidentCategories
+  const severities = incidentSeverities
 
   const isSaving = createDraft.isPending || updateDraft.isPending
   const isSubmitting = submitIncident.isPending || submitNewIncident.isPending
