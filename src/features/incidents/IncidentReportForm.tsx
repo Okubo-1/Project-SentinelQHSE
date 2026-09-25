@@ -111,7 +111,7 @@ function toDraftInput(values: IncidentFormValues, draftStage: number): IncidentD
   }
 }
 
-export function IncidentReportForm({ supabase, reportType, initialTitle, initialCategory, initialEnvironmentalImpact, draftId: existingDraftId, initialIncident, onBack }: { supabase: SupabaseClient; reportType: IncidentReportType; initialTitle?: string; initialCategory?: string; initialEnvironmentalImpact?: boolean; draftId?: string; initialIncident?: IncidentDetail; onBack: () => void }) {
+export function IncidentReportForm({ supabase, reportType, initialTitle, initialCategory, initialEnvironmentalImpact, draftId: existingDraftId, initialIncident }: { supabase: SupabaseClient; reportType: IncidentReportType; initialTitle?: string; initialCategory?: string; initialEnvironmentalImpact?: boolean; draftId?: string; initialIncident?: IncidentDetail }) {
   const organization = useIncidentOrganization(supabase)
   const existingDraft = useIncident(supabase, existingDraftId || null)
   const loadedIncident = initialIncident || existingDraft.data
@@ -401,20 +401,6 @@ export function IncidentReportForm({ supabase, reportType, initialTitle, initial
         {submitError && <div className="auth-message error" role="alert">{submitError}</div>}
         {submitMessage && <div className="auth-message success" role="status">{submitMessage}</div>}
         <div className="incident-form-actions">
-          <button
-            className="button button-outline button-large"
-            type="button"
-            disabled={isBusy}
-            onClick={() => {
-              if (activeStage > 0) {
-                setActiveStage((stage) => stage - 1)
-              } else {
-                onBack()
-              }
-            }}
-          >
-            Back
-          </button>
           {activeStage < stages.length - 1 ? <button className="button button-green button-large" type="button" disabled={isBusy} onClick={() => void continueStage()}>Continue</button> : (
             <>
               <button className="button button-outline button-large" type="button" disabled={isBusy} onClick={() => void saveDraft()}>Save as Draft</button>

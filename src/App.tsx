@@ -639,7 +639,7 @@ function ProtectedApp({ session, isDarkMode, onToggleTheme }: { session: Session
         </header>
         <section className="workspace-content">
           {route === 'dashboard' && <DashboardPage organizationId={organizationId} organizationName={organizationName} userName={profileName} role={legacyFeatureRole} canReportIncident={canAccess('report_incident')} canCreateInspection={canAccess('create_inspection')} canCreateCorrectiveAction={canAccess('create_corrective_action')} canStartAudit={canAccess('start_audit')} canViewReports={canAccess('view_reports')} supabase={supabase} />}
-          {route === 'report-incident' && canAccess('report_incident') && <IncidentReportForm key={`report-incident-${navResetKey}`} supabase={supabase} reportType="incident" draftId={new URLSearchParams(window.location.hash.split('?')[1] || '').get('draft') || undefined} onBack={() => { window.location.hash = '#dashboard' }} />}
+          {route === 'report-incident' && canAccess('report_incident') && <IncidentReportForm key={`report-incident-${navResetKey}`} supabase={supabase} reportType="incident" draftId={new URLSearchParams(window.location.hash.split('?')[1] || '').get('draft') || undefined} />}
           {route === 'my-reports' && canAccess('view_own_reports') && <MyReportsPage supabase={supabase} scope="own" canExport={canAccess('export_reports')} />}
           {route === 'incident-detail' && <IncidentDetailPage supabase={supabase} incidentId={new URLSearchParams(window.location.hash.split('?')[1] || '').get('id')} />}
           {route === 'incidents' && canAccess('view_all_incidents') && <MyReportsPage supabase={supabase} scope="organization" canExport={canAccess('export_reports')} />}

@@ -105,7 +105,7 @@ export function IncidentTypeSelectionPage({ role, supabase, draftId }: { role: R
   if (draftId) {
     if (draft.isLoading) return <div className="workspace-panel">Loading draft...</div>
     if (draft.isError || !draft.data || draft.data.status !== 'draft') return <div className="workspace-panel"><div className="auth-message error">This draft could not be loaded or is no longer editable.</div><a className="button button-outline workspace-back-link" href="#my-reports">Return to My Reports</a></div>
-    return <IncidentReportForm supabase={supabase} reportType={draft.data.reportType} draftId={draft.data.id} initialIncident={draft.data} onBack={() => { window.location.hash = '#my-reports' }} />
+    return <IncidentReportForm supabase={supabase} reportType={draft.data.reportType} draftId={draft.data.id} initialIncident={draft.data} />
   }
 
   if (isFormOpen && selectedType) {
@@ -116,7 +116,6 @@ export function IncidentTypeSelectionPage({ role, supabase, draftId }: { role: R
         initialTitle={selectedTitle}
         initialCategory={selectedCategory}
         initialEnvironmentalImpact={selectedEnvironmentalImpact}
-        onBack={() => setIsFormOpen(false)}
       />
     )
   }
